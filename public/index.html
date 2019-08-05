@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/jquery.js"></script>
+    <script src="/babylon.js"></script>
+    <script src="/babylonjs.materials.min.js"></script>
+    <script src="/babylon.gui.min.js"></script>
+    <script src="/pep.min.js"></script>
+    <script src="/babylonjs.loaders.min.js"></script>
+    <title>电信Vr游戏大厅</title>
+    <style>
+
+   #gdMsglog {
+    padding: 0.5em;
+    height: 20%;
+    width: 40%;
+    background:rgba(0,0,0,0.4);     
+    overflow:scroll;
+    overflow-x: hidden; overflow-y: auto;
+    bottom: 4em;
+    left: 2em;
+    position: fixed;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+  }
+    #DivInput{
+        padding-right: 0.5em;padding-left: 0.5em;
+        height: 2em;
+        width: 40%;
+        background:rgba(0,0,0,0.6);  
+        border-bottom-left-radius: 4px;
+        border-bottom-right-radius: 4px;
+        bottom: 2em;
+        left: 2em;
+        position: fixed;
+        }
+    #textInput{
+        width:60%;
+        height: 2em;
+        border-bottom-left-radius: 4px;
+        background:rgba(0,0,0,0.6);  
+        color:white;
+        }
+  #start,#sendText{
+    padding-left: 1vw;
+    font-size:0.5rem;
+        width:18%;
+        height: 2em;
+        border: 0;
+        background-color: #448aff21;
+        text-decoration: none;
+/*        border-radius: 2px;
+*/        color: #448aff !important;
+        color: black;
+        background:rgba(1,1,1,0.6);  
+  }
+          html,
+        body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            z-index: -1;
+        }
+
+    </style>
+</head>
+
+<body >
+<!-- <a href="https://www.babylonjs-playground.com/#GM1XMV#3">W3School</a> -->
+    <canvas id="renderCanvas"></canvas>
+<!--     <div id="gdMsglog"></div>
+    <div id="DivInput">
+    <input id="textInput" type="text" >
+    <button id="sendText">发送</button>
+    <button id="start">长按录音</button> -->
+    </div>
+    <script>
+        window.bg;
+        window.logNum = 0;
+        window.voiceNum = 0;
+        window.userName = '';
+        window.gdMsglog;
+        window.sv;
+        userName = prompt("请设置你的昵称","");
+        window.socket = io();
+        window.voiceArray=new Array();
+        window.audio = new Audio();
+          socket.on('connect', function () {
+            socket.emit('join', userName);
+          });
+
+
+        socket.on('msg', function (userName, msg) 
+        {
+            if(typeof(msg[1])!="undefined")
+            if(typeof(msg[1])!="object")
+                {
+                addMsg(userName,msg[1]);
+                }
+            else{
+                console.log(msg[1]);
+                voiceArray[voiceNum] = msg[1];
+                addVoice(userName,msg[1]);
+            }
+
+        });
+
+            function playVoice(voiceIndex){
+                try{
+                audio.pause();
+                audio.src = URL.createObjectURL(new Blob(voiceArray[voiceIndex]));
+                audio.play();
+                }catch(err){
+                    alert(err);
+                }
+
+        }
+
+        socket.on('sys', function (sysMsg, users) {
+
+        });
+        let l = console.log
+        // const stopButton = document.getElementById('stop');
+        // const startButton = document.getElementById('start');
+        // const sendTextButton = document.getElementById('sendText');
+        // sendTextButton.addEventListener('click', e => {
+        //  var input = document.getElementById('textInput');
+        //     socket.send(input.value);
+        //     input.value="";
+        // })
+        
+
+        var canvas = document.getElementById("renderCanvas");
+        var engine = new BABYLON.Engine(canvas, true);
+        var createScene = function() {
+            var scene = new BABYLON.Scene(engine); //场景对象
+            var anchor = new BABYLON.TransformNode("");
+            var vrHelper = scene.createDefaultVRExperience();
+            vrHelper.position = new BABYLON.Vector3(0, 20, -20); //vrhelp 内置相机坐标
+            var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene); //平行光灯光对象
+            var camera = new BABYLON.ArcRotateCamera("camera1", Math.PI / 4, Math.PI / 2, 3, new BABYLON.Vector3(0, 20, -20), scene); //环绕相机对象
+            camera.position = new BABYLON.Vector3(0, 10, -20); //环绕相机坐标
+            camera.attachControl(canvas, true);
+            var skybox = BABYLON.MeshBuilder.CreateBox("skyBox", {
+                size: 100.0
+            }, scene); //天空盒子 （场景）
+            var skyboxMaterial = new BABYLON.StandardMaterial("skyBox", scene);
+            skyboxMaterial.backFaceCulling = false;
+            skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("textures/skybox", scene);
+            skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+            skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+            skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+            skybox.material = skyboxMaterial;
+            skybox.position = new BABYLON.Vector3(0, 0, 0); //天空盒子位置
+            var plane = BABYLON.Mesh.CreatePlane("plane", 40);
+            plane.position.set(0, 2, 10);
+            console.log(plane.position);
+            // plane.position = vrHelper.webVRCamera.getFrontPosition;
+             scene.registerBeforeRender(function() {
+                if(vrHelper.isInVRMode){
+                    // console.log(vrHelper._vrDeviceOrientationCamera);
+                    // console.log(vrHelper._vrDeviceOrientationCamera.cameraRotation);
+                    plane.rotation = vrHelper.webVRCamera.rotation;
+                }
+            });
+            var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(plane);
+            // vrHelper.enableTeleportation({ floorMeshName: "skyBox" });
+            // vrHelper.enableInteractions();
+            var gd =  new BABYLON.GUI.Grid();
+            gd.width = 0.4;
+            gd.height = 0.25;
+            gd.addRowDefinition(4/5);
+            gd.addRowDefinition(1/5);
+            gd.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+            gd.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+            // gd.background = "black";
+            gd.paddingLeft = "2%";
+            gd.paddingBottom = "10%";
+            // gd.alph  a=0.4;
+            advancedTexture.addControl(gd);
+            sv = new BABYLON.GUI.ScrollViewer("sv");
+            sv.width = 1;
+            sv.height = 1;
+            gd.addControl(sv,0,0);
+
+            var gdInput = new BABYLON.GUI.Grid("gd");
+            gdInput.width = 1;
+            gdInput.height = 1;
+            gdInput.background = "black";
+            gdInput.alpha= 0.4;
+            gdInput.addColumnDefinition(3/5);
+            gdInput.addColumnDefinition(1/5);
+            gdInput.addColumnDefinition(1/5);
+            gd.addControl(gdInput,1,0);
+
+            var inputText = new BABYLON.GUI.InputText("inputtext");
+            inputText.width = 1;
+            inputText.height = 1;
+            inputText.color = "white";
+            gdInput.addControl(inputText,0,0);
+            var sendBtn = BABYLON.GUI.Button.CreateSimpleButton("sendBtn", "发送");
+            sendBtn.width = 1;
+            sendBtn.height = 1;
+            sendBtn.color = "white"
+            gdInput.addControl(sendBtn,0,1);
+            var voiceBtn = BABYLON.GUI.Button.CreateSimpleButton("voiceBtn", "按下录音");
+            voiceBtn.width = 1;
+            voiceBtn.height = 1;
+            voiceBtn.color = "white"
+            gdInput.addControl(voiceBtn,0,2);
+
+            sendBtn.onPointerClickObservable.add(() => {
+                var textMsg = [];
+                    var type = "home";
+                    textMsg.push(type);
+                    textMsg.push(inputText.text);
+                    socket.send(textMsg);
+                    inputText.text="";
+            })
+
+            navigator.mediaDevices.getUserMedia({
+                audio: true,
+                // video: true
+            })
+            .then(stream => {
+            voiceBtn.onPointerUpObservable.add(() => {
+                    mediaRecorder.stop();
+                    voiceBtn.textBlock.text  = '长按录音';
+                })
+
+            voiceBtn.onPointerDownObservable.add(() => {
+                    mediaRecorder.start();
+                    voiceBtn.textBlock.text  = '松开发送';
+                })
+                var recordedChunks = [];
+
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.addEventListener('dataavailable', function (e) {
+                    recordedChunks = [];
+                    if (e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                    }
+                });
+
+                mediaRecorder.addEventListener('stop', function () {
+                    l('暂停')
+                    var data = ["home",recordedChunks];
+                    socket.send(data);
+                });
+
+                mediaRecorder.addEventListener('start', e => {
+                    l('开始')
+                })
+            });
+
+            // bg = new BABYLON.GUI.Container('bg');
+            bg = new BABYLON.GUI.Container('bgcolor');
+            bg.background = "black";
+            bg.alpha = 0.3;
+            sv.addControl(bg);
+            gdMsglog = new BABYLON.GUI.Grid();
+            gdMsglog.heightInPixels = bg.heightInPixels;
+            sv.addControl(gdMsglog);
+
+            var assetsManager = new BABYLON.AssetsManager(scene);
+            var meshTask = assetsManager.addMeshTask("human", "", "scenes/", "human.babylon");
+            // console.log(meshTask);
+            meshTask.onSuccess = function (task) {
+                console.log(task);
+                // task.loadedMeshes[2].position = BABYLON.Vector3.Zero();
+                // task.loadedMeshes.scaling.scaleInPlace(1)
+                 task.loadedMeshes.forEach(function(mesh, index) {
+                    mesh.position = BABYLON.Vector3.Zero();
+                    mesh.scaling.scaleInPlace(0.05);
+                    mesh.rotation =new BABYLON.Vector3(Math.PI*1.5,0,0);
+                    });
+                scene.beginAnimation(task.loadedSkeletons[0],0,45,true,1.0);
+                console.log("success");
+            }
+            meshTask.onError = function (task, message, exception) {
+                console.log(message, exception);
+            }
+            assetsManager.load();
+            // BABYLON.SceneLoader.Append("scenes/", "1.gltf", scene, function (scene) {
+            //     // do something with the scene
+            // });
+     scene.onPointerDown = function (evt, pickResult) {
+        console.log(pickResult.pickedPoint);
+        }
+            return scene;
+        }
+        var scene = createScene();
+        engine.runRenderLoop(function() {
+            scene.render();
+        });
+        window.addEventListener("resize", function() {
+            engine.resize();
+        });
+
+       function addMsg(userName,msg){
+            var gdText = new BABYLON.GUI.Grid();
+            gdText.addColumnDefinition(65,true);
+            gdText.addColumnDefinition(200,true);
+            var tb = new BABYLON.GUI.TextBlock();
+            tb.textWrapping = BABYLON.GUI.TextWrapping.WordWrap;
+            tb.paddingTop = "10px";
+            tb.paddingLeft = "10px";
+            tb.paddingRight = "2%";
+            tb.paddingBottom = "2%";     
+            tb.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            tb.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+            tb.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            tb.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+            tb.color = "white";
+            tb.text = userName+":";
+            tb.resizeToFit = true;
+            gdText.addControl(tb,0,0);
+            var tbMsg = new BABYLON.GUI.TextBlock();
+            tbMsg.textWrapping = BABYLON.GUI.TextWrapping.WordWrap;
+            tbMsg.paddingTop = "10px";
+            tbMsg.paddingLeft = "10px";
+            tbMsg.paddingRight = "2%";
+            tbMsg.paddingBottom = "2%";     
+            tbMsg.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            tbMsg.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+            tbMsg.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            tbMsg.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+            tbMsg.color = "white";
+            tbMsg.text = msg;
+            gdText.addControl(tbMsg,0,1);
+            gdMsglog.addRowDefinition(40,true);
+            gdMsglog.addControl(gdText,logNum+voiceNum,0);
+            console.log(bg.heightInPixels);
+            gdMsglog.height = (logNum+1)*40+(voiceNum+1)*40+"px";
+            if(bg.heightInPixels<((logNum+1)*40+(voiceNum+1)*40)){
+            bg.height = (logNum+1)*40+(voiceNum+1)*40+"px";
+            }
+            sv.verticalBar.value = 1;
+            logNum++;
+        }
+
+        function addVoice(userName,msg){
+            var gdVoice = new BABYLON.GUI.Grid();
+            gdVoice.addColumnDefinition(65,true);
+            gdVoice.addColumnDefinition(200,true);
+            var tb = new BABYLON.GUI.TextBlock();
+            tb.textWrapping = BABYLON.GUI.TextWrapping.WordWrap;
+            tb.resizeToFit = true;
+            tb.paddingTop = "10px";
+            tb.paddingLeft = "10px";
+            tb.paddingRight = "10px";
+            tb.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            tb.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+            tb.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            tb.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+            tb.color = "white";
+            tb.text = userName+":";
+            gdVoice.addControl(tb,0,0);
+            var imgVoice = BABYLON.GUI.Button.CreateImageOnlyButton(voiceNum, "textures/yyt.png");
+
+            // var imgVoice = new BABYLON.GUI.Image(voiceNum, "textures/yyt.png");
+            imgVoice.width = "200px";
+            imgVoice.height = "30px";
+            imgVoice.color = "transparent";
+            imgVoice.onPointerClickObservable.add(() => {
+                    playVoice(imgVoice.name);
+                    l(imgVoice.name);
+                })
+            gdVoice.addControl(imgVoice,0,1);
+            gdMsglog.addRowDefinition(40,true);
+            gdMsglog.addControl(gdVoice,logNum+voiceNum,0);
+            console.log(gdMsglog.heightInPixels);
+            gdMsglog.height = (logNum+1)*40+(voiceNum+1)*40+"px";
+            if(bg.heightInPixels<((logNum+1)*40+(voiceNum+1)*40)){
+            bg.height = (logNum+1)*40+(voiceNum+1)*40+"px";
+            }
+            sv.verticalBar.value = 1;
+            voiceNum++;
+        }
+    </script>
+</body>
+
+</html>

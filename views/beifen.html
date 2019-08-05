@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>五子棋</title>
+  <script src="/babylon.js"></script>
+  <script src="/babylonjs.materials.min.js"></script>
+  <script src="/babylon.gui.min.js"></script>
+  <script src="pep.min.js"></script>
+  <style>
+  #msglog, #messageInput {
+    border: 1px solid #ccc;
+    width: 500px;
+    height: 350px;
+    overflow-y: auto;
+    font-size: 14px;
+  }
+  #messageInput {
+    height: 80px;
+  }
+  .message {
+    line-height: 22px;
+  }
+  .message .user {
+    padding-right: 5px;
+    padding-left: 5px;
+    color: brown;
+  }
+  .sysMsg {
+    color: #c1bfbf;
+    padding-right: 5px;
+    padding-left: 5px;
+    font-size: 12px;
+  }
+  #users {
+    width: 490px;
+    padding: 0 5px 5px;
+  }
+    html,
+    body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+  #renderCanvas {
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  </style>
+</head>
+<body>
+ <!--  昵称: <span id="userName"></span> <br/>
+  房间: {{roomID}} <br/>
+  当前在线人数: <span id="count">{{users.length}}</span> <br/>
+  在线用户:  <div id="users">{{users}}</div>
+
+  <div id="msglog">
+
+  </div>
+  <textarea name="message" id="messageInput"></textarea>
+  <br/>
+  按Enter键发送
+  <button id="joinOrLeave">退出房间</button> -->
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/jquery.js"></script>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+  $(function () {
+    window.group;
+    window.background;
+    window.advancedTexture;
+    window.button1;
+    window.textblock;
+    window.textblock2;
+    // window.textblock3;
+    window.textblock4;
+      window.Character = 0;//黑或白或旁观者
+      window.state  = 0;//0待机 1 进行中 2 游戏结束
+      window.islock = 0;
+      // ----------设置昵称-------------
+      window.userName = '';
+      // while ($('#userName').text().trim() === '') {
+
+        userName = prompt("请设置你的昵称","");
+        $('#userName').text(userName);
+
+      // }
+
+
+      // ---------创建连接-----------
+      window.socket = io();
+
+      // 加入房间
+      socket.on('connect', function () {
+        socket.emit('join', userName);
+      });
+
+      // 监听消息
+      socket.on('msg', function (userName, msg) {
+        // var message = '' +
+        // '<div class="message">' +
+        // '  <span class="user">' + userName + ': </span>' +
+        // '  <span class="msg">' + msg + '</span>' +
+        // '</div>';
+        // $('#msglog').append(message);
+        // // 滚动条保持最下方
+        // $('#msglog').scrollTop($('#msglog')[0].scrollHeight);  
+        panel2.addControl(textblock4);
+        var splited = msg.split(',');
+        if(state==2&&Character!=splited[2]){
+          advancedTexture.dispose();
+          gameOver();
+          panel2.addControl(textblock4);
+        }
+        if(Character!=splited[2]){
+          var blackColor = new BABYLON.StandardMaterial("blackColor", scene);
+          blackColor.diffuseColor  = new BABYLON.Color3(0, 0, 0);
+          var whiteColor = new BABYLON.StandardMaterial("whiteColor", scene);
+          whiteColor.diffuseColor  = new BABYLON.Color3(1, 1, 1);
+          var x = (splited[0]-groundSize/2)*2.5;
+          var y = (splited[1]-groundSize/2)*2.5;
+          var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameterX: 2, diameterY: 0.5, diameterZ:2 }, scene);
+          sphere.position = new BABYLON.Vector3(x,0.5 * boxSize + 0.01,y);
+          if(splited[2] ==1){
+            sphere.material = whiteColor;
+          }else{
+            sphere.material = blackColor;
+          }
+          sphereGroup.push(sphere);
+          pieces[splited[0]][splited[1]] = splited[2];
+          if(checkWin(splited[0],splited[1],splited[2])){
+            state = 2;
+            advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+            var button = BABYLON.GUI.Button.CreateSimpleButton("btn", "Lost");
+            button.width = 0.4
+            button.height = "60px";
+            button.color = "white";
+            button.background = "red";
+            advancedTexture.addControl(button);
+            button.onPointerClickObservable.add(() => {
+              advancedTexture.dispose();
+              gameOver();
+              if(Character==0){
+                panel2.addControl(button1);
+              }
+            })
+          }else{
+            textblock4.text = "轮到:"+ group[Math.abs(Character)];
+            islock = 0;
+            state = 1;
+          }
+
+        }
+      });
+
+      // 监听系统消息
+      socket.on('sys', function (sysMsg, users) {
+        if(sysMsg.indexOf("退出") != -1){
+          var leaveUser = sysMsg.split('退出')[0];
+          if(group.indexOf(leaveUser)<2&&state==1){
+            state=2;
+            var advancedTexture1 = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+            var button = BABYLON.GUI.Button.CreateSimpleButton("btn", "玩家退出，游戏结束");
+            button.width = 0.4
+            button.height = "60px";
+            button.color = "white";
+            button.background = "red";
+            advancedTexture1.addControl(button)
+            button.onPointerClickObservable.add(() => {
+              advancedTexture1.dispose();
+              gameOver();
+            })
+          }
+        }else{
+          group = users;
+          Character = group.indexOf(userName);
+          if(group.length<3){
+            console.log(sysMsg);
+
+            var play1 = "";
+            var play2 = "";
+            var observer = [];
+            if(group.length>0)
+              var play1 = group[0];
+            if(group.length>1){
+              var play2 = group[1];
+              if(Character==0)
+                panel2.addControl(button1);
+            }else{
+              if(Character==0)
+                panel2.removeControl(button1);
+            }
+      
+        textblock.text = "玩家1:" + play1+"(房主)";
+        textblock2.text = "玩家2:"+play2;
+        // textblock3.text = "旁观者:"+ observer;
+        if(Character==1){
+          islock = 1;
+        }
+
+      }else{
+            if(Character==2){
+              alert("房间已满");
+              window.location  ="/";     
+            }
+      }
+
+
+    }
+
+        //   if(users.length>=2){
+        //     console.log(users);
+        //   alert("房间已满");
+        //   window.open("","_self").close();
+        // }
+        // var message = '<div class="sysMsg">' + sysMsg + '</div>';
+        // $('#msglog').append(message);
+        // $('#count').text(users.length);
+        // $('#users').text(users);
+      });
+    });
+   var groundSize = 8;//棋盘大小
+    var boxSize = 2.5; //盒子大小
+    var offset =0; //每格偏移量
+    var pieces = new Array();      
+    var sphereGroup =  [];
+    for(var i=0;i<groundSize;i++){          
+      pieces[i]=new Array();    
+      for(var j=0;j<groundSize;j++){      
+       pieces[i][j]=-1;
+     }
+   }
+   var canvas = document.getElementById("renderCanvas");
+   var engine = new BABYLON.Engine(canvas, true);
+   var createScene = function() {
+    var scene = new BABYLON.Scene(engine); //场景对象
+    var anchor = new BABYLON.TransformNode("");
+    var vrHelper = scene.createDefaultVRExperience();
+    vrHelper.position = new BABYLON.Vector3(0, 20, -20); //vrhelp 内置相机坐标
+    var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene); //平行光灯光对象
+    var camera = new BABYLON.ArcRotateCamera("camera1", Math.PI / 4, Math.PI / 2, 3, new BABYLON.Vector3(0, 20, -20), scene); //环绕相机对象
+    camera.position = new BABYLON.Vector3(0, 20, -20); //环绕相机坐标
+    camera.attachControl(canvas, true);
+    // Add and manipulate meshes in the scene
+    var hdrTexture = new BABYLON.HDRCubeTexture("/textures/room.hdr", scene, 512);
+
+    // Skybox
+    var hdrSkybox = BABYLON.Mesh.CreateBox("hdrSkyBox", 100.0, scene);
+
+    var hdrSkyboxMaterial = new BABYLON.PBRMaterial("skyBox", scene);
+    hdrSkyboxMaterial.backFaceCulling = false;
+    hdrSkyboxMaterial.reflectionTexture = hdrTexture.clone();
+    hdrSkyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+    hdrSkyboxMaterial.microSurface = 1.0;
+    hdrSkyboxMaterial.cameraExposure = 0.6;
+    hdrSkyboxMaterial.cameraContrast = 1.6;
+    hdrSkyboxMaterial.disableLighting = true;
+    hdrSkybox.material = hdrSkyboxMaterial;
+    hdrSkybox.infiniteDistance = true;
+
+    var blackColor = new BABYLON.StandardMaterial("blackColor", scene);
+    blackColor.diffuseColor  = new BABYLON.Color3(0, 0, 0);
+    var whiteColor = new BABYLON.StandardMaterial("whiteColor", scene);
+    whiteColor.diffuseColor  = new BABYLON.Color3(1, 1, 1);
+    var playgroundSize = 30;
+    // var font_size = 48;
+    // var font = "bold " + font_size + "px Arial";
+    // backgroundTexture = new BABYLON.DynamicTexture("dynamic texture", 800, scene, true);
+    // backgroundTexture.drawText("在线用户：", null, null, font, "#000000", "transparent", true);
+    // backgroundTexture.hasAlpha = true
+    background = BABYLON.Mesh.CreatePlane("background", playgroundSize, scene, false);
+    background.material = new BABYLON.StandardMaterial("background", scene);
+    background.scaling.y = 0.5;
+    background.position.z = playgroundSize / 2 - 0.5;
+    background.position.y = playgroundSize / 4;
+    background.receiveShadows = true;
+
+    // background.material.diffuseTexture = backgroundTexture;
+    background.material.backFaceCulling = false;
+    // camera.setTarget(background);
+
+    var advancedTexture2 = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(background);
+    panel2 = new BABYLON.GUI.Rectangle("rect");
+    panel2.background = "white";
+    panel2.color = "black";
+    panel2.width = "1000px";
+    panel2.height = "600px";
+    panel2.cornerRadius = 20;
+    advancedTexture2.addControl(panel2);    
+   
+    // panel2 = new BABYLON.GUI.StackPanel();  
+    // panel2.color = "black"
+    // panel2.left = "50px";
+    // panel2.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+    // rectangle.addControl(panel2);
+    textblock = new BABYLON.GUI.TextBlock();
+    textblock.fontFamily = "Helvetica";
+    textblock.textWrapping = true;
+    textblock.color = "black";
+    textblock.fontSize = "80";
+    textblock.paddingTop = "20px";
+    textblock.paddingLeft = "30px";
+    textblock.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+    textblock.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+    textblock.text = "玩家1:(房主)";
+    // textblock.lineSpacing = "4px";
+    panel2.addControl(textblock);   
+    textblock2 = new BABYLON.GUI.TextBlock();
+    textblock2.fontFamily = "Helvetica";
+    textblock2.textWrapping = true;
+    textblock2.color = "black";
+    textblock2.fontSize = "80";
+    textblock2.paddingTop = "150px";
+    textblock2.paddingLeft = "30px";
+    textblock2.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+    textblock2.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+    textblock2.text = "玩家2:";
+    panel2.addControl(textblock2);   
+    // textblock3 = new BABYLON.GUI.TextBlock();
+    // textblock3.height = "130px";
+    // textblock3.fontSize = 80;
+    // textblock3.text = "旁观者:";
+    // textblock3.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+    // panel2.addControl(textblock3);   
+    textblock4 = new BABYLON.GUI.TextBlock();
+    textblock4.fontFamily = "Helvetica";
+    textblock4.textWrapping = true;
+    textblock4.color = "black";
+    textblock4.fontSize = "80";
+    textblock4.paddingTop = "270px";
+    textblock4.paddingLeft = "30px";
+    textblock4.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+    textblock4.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+    // textblock4.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+    textblock4.text = "轮到:";
+    button1 = BABYLON.GUI.Button.CreateSimpleButton("but1", "开始游戏");
+    button1.width = 0.3;
+    button1.height = "100px";
+    button1.paddingTop = "10px";
+    button1.color = "white";
+    button1.fontSize = 50;
+    button1.background = "red";
+    button1.color = "Orange";
+    button1.thickness = 4;
+    button1.cornerRadius = 20;
+    button1.onPointerClickObservable.add(() => {
+      state = 1;
+      islock = 0;
+      panel2.removeControl(button1);
+      panel2.addControl(textblock4);
+      textblock4.text = "轮到:" + group[Character];
+    })
+    // panel2.addControl(button1);
+
+    // panel2.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+    // panel2.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+    var ground = BABYLON.MeshBuilder.CreateGround("mGround", {
+      width: boxSize,
+      height: boxSize,
+      subdivisions: 4
+            }, scene); //创建放置地板块1
+
+    var materialSphere2 = new BABYLON.StandardMaterial("textures2", scene);
+    materialSphere2.ambientTexture = new BABYLON.Texture("/textures/ground.jpg", scene); //放置地板块纹理
+    ground.material = materialSphere2;
+    ground.checkCollisions = true;
+    ground.isPickable = true;
+    ground.position = new BABYLON.Vector3(0 * boxSize + offset, 0.5 * boxSize + 0.01, 0 * boxSize - offset); //墙模型初始位置
+    vrHelper.enableTeleportation();
+    var i = 0;
+    for (var index = -groundSize/2; index < groundSize/2; index++) {
+      for(var index2 = -groundSize/2;index2<groundSize/2;index2++){
+    // 复制放置一堆墙模型
+    i++;
+    var newInstance = ground.createInstance("mGround" + i);
+    newInstance.checkCollisions = true;
+    newInstance.ellipsoid = new BABYLON.Vector3(offset, offset, offset);
+    newInstance.position.x = index * boxSize + offset;
+    newInstance.position.z = index2 * boxSize - offset;
+  }}
+
+    // vrHelper.enableTeleportation({ floorMeshName: "ground2" });
+
+
+  scene.onPointerDown = function (evt, pickResult) {
+        // We try to pick an object
+        if (pickResult.hit) {
+            // console.log(pickResult.pickedMesh.position);
+            var x = pickResult.pickedMesh.position.x/2.5 + groundSize/2;
+            var y = pickResult.pickedMesh.position.z/2.5 + groundSize/2; 
+            console.log("state:"+state+"islock:"+islock);
+            console.log(pickResult.pickedMesh.name);
+            if(pieces[x][y]==-1&&state==1&&islock==0&&pickResult.pickedMesh.name.indexOf("ground")!=-1){
+              islock = 1;
+              var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameterX: 2, diameterY: 0.5, diameterZ:2 }, scene);
+              sphere.position = pickResult.pickedMesh.position;
+              if(Character ==1){
+                sphere.material = whiteColor;
+              }else{
+                sphere.material = blackColor;
+
+              }
+              sphereGroup.push(sphere);
+              pieces[x][y] = Character;
+              socket.send(x+","+y+","+Character);
+              textblock4.text = "轮到:"+ group[Math.abs(1-Character)];
+              // console.log(pieces);
+              if(checkWin(x,y,Character)){
+                state = 2;
+                advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+                var button = BABYLON.GUI.Button.CreateSimpleButton("btn", "Win");
+                button.width = 0.4
+                button.height = "60px";
+                button.color = "white";
+                button.background = "red";
+                advancedTexture.addControl(button)
+                button.onPointerClickObservable.add(() => {
+                  advancedTexture.dispose();
+                  gameOver();
+                  if(Character==0){
+                    panel2.addControl(button1);
+                  }
+                })
+
+              }
+            }
+
+          }
+        };
+
+
+        return scene;
+
+      }
+
+      function gameOver(){
+        state = 0;
+        panel2.removeControl(textblock4);
+        sphereGroup.forEach(function(sphere, index) {
+          sphere.dispose();
+        })
+        for(var i=0;i<groundSize;i++){          
+          pieces[i]=new Array();    
+          for(var j=0;j<groundSize;j++){      
+           pieces[i][j]=-1;
+         }
+       }
+     }
+
+     function checkWin(x1,y1,character){
+      var x = parseInt(x1);
+      var y = parseInt(y1);
+        // console.log("x:"+x+",y:"+y+",character:"+character);
+         //横向
+         var count1 = 0;
+         for(var i = 1;i < 5;i++)
+         {
+                        //超出棋盘
+                        if((x - i) < 0)
+                        {
+                                //结束左横向检测
+                                break;
+                              }
+                        //统计相同棋子数
+                        if(pieces[x - i][y] == character)
+                        {
+                          count1++;
+                        }else{
+                          break;
+                        }
+                      }
+                      for(var i = 1;i < 5 ;i++)
+                      {
+                        //超出棋盘
+                        if(x + i >= groundSize)
+                        {
+                                //结束右横向检测
+                                break;
+                              }
+                              console.log(x+i);  
+                              console.log(y);  
+                              console.log(pieces[0][7])
+                              if(pieces[x + i][y] == character)
+                              {
+                                count1++;
+                              }else{
+                                break;
+                              }
+                            }
+                            if(count1 >= 4)
+                            {
+                              return true;
+                            }
+//纵向
+var count2 = 0;
+for(var i = 1;i < 5;i++)
+{
+                        //超出棋盘
+                        if((y - i) < 0)
+                        {
+                                //结束上纵向检测
+                                break;
+                              }
+                        //统计相同棋子数
+                        if(pieces[x][y - i] == character)
+                        {
+                          count2++;
+                        }else{
+                          break;
+                        }
+                      }
+                      for(var i = 1;i < 5 ;i++)
+                      {
+
+                        //超出棋盘
+                        if(y + i >= groundSize)
+                        {
+                                //结束下纵向检测
+                                break;
+                              }
+                              if(pieces[x][y + i] == character)
+                              {
+                                count2++;
+                              }else{
+                                break;
+                              }
+                            }
+                            if(count2 >= 4)
+                            {
+                              return true;
+                            }
+//斜下
+var count3 = 0;
+for(var i = 1;i < 5;i++)
+{
+                        //超出棋盘
+                        if((x - i) < 0 || (y - i) < 0)
+                        {
+                                //结束上斜下向检测
+                                break;
+                              }
+                        //统计相同棋子数
+                        if(pieces[x - i][y - i] == character)
+                        {
+                          count3++;
+                        }else{
+                          break;
+                        }
+                      }
+                      for(var i = 1;i < 5;i++)
+                      {
+                        //超出棋盘
+                        if(x + i >= groundSize || (y + i) >=groundSize)
+                        {
+                                //结束下斜下向检测
+                                break;
+                              }
+                              if(pieces[x + i][y + i] == character)
+                              {
+                                count3++;
+                              }else{
+                                break;
+                              }
+                            }
+                            if(count3 >= 4)
+                            {
+                              return true;
+                            }
+//斜上
+var count4 = 0;
+for(var i = 1;i < 5;i++)
+{
+                        //超出棋盘
+                        if((x + i) >=groundSize || (y - i) < 0)
+                        {
+                                //结束上斜上向检测
+                                break;
+                              }
+                        //统计相同棋子数
+                        if(pieces[x + i][y - i] == character)
+                        {
+                          count4++;
+                        }else{
+                          break;
+                        }
+                      }
+
+
+                      for(var i = 1;i < 5;i++)
+                      {
+                        //超出棋盘
+                        if(x - i < 0 || (y + i) >= groundSize)
+                        {
+                                //结束下斜下向检测
+                                break;
+                              }
+
+                              if(pieces[x - i][y + i] == character)
+                              {
+                                count4++;
+                              }else{
+                                break;
+                              }
+                            }
+                            if(count4 >= 4)
+                            {
+                              return true;
+                            }
+                            return false;
+                          }
+                          var scene = createScene();
+                          engine.runRenderLoop(function() {
+                            scene.render();
+                          });
+                          window.addEventListener("resize", function() {
+                            engine.resize();
+                          });
+                          </script>
+                        </body>
+                        </html>
