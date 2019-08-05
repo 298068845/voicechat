@@ -165,6 +165,12 @@
             skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
             skybox.material = skyboxMaterial;
             skybox.position = new BABYLON.Vector3(0, 0, 0); //天空盒子位置
+            var ground = BABYLON.Mesh.CreateGround("myGround", 23, 23, 4, scene);
+
+            var materialSphere1 = new BABYLON.StandardMaterial("textures1", scene);
+            materialSphere1.ambientTexture = new BABYLON.Texture("textures/skybox_py.jpg", scene); //地板纹理图片
+            ground.material = materialSphere1;
+            ground.checkCollisions = true;
             var plane = BABYLON.Mesh.CreatePlane("plane", 40);
             plane.position.set(0, 2, 10);
             console.log(plane.position);
@@ -279,13 +285,13 @@
             var meshTask = assetsManager.addMeshTask("human", "", "scenes/", "human.babylon");
             // console.log(meshTask);
             meshTask.onSuccess = function (task) {
-                console.log(task);
+                // console.log(task);
                 // task.loadedMeshes[2].position = BABYLON.Vector3.Zero();
                 // task.loadedMeshes.scaling.scaleInPlace(1)
                  task.loadedMeshes.forEach(function(mesh, index) {
                     mesh.position = BABYLON.Vector3.Zero();
                     mesh.scaling.scaleInPlace(0.05);
-                    mesh.rotation =new BABYLON.Vector3(Math.PI*1.5,0,0);
+                    mesh.rotation =new BABYLON.Vector3(Math.PI*1.5,-Math.PI/2,0);
                     });
                 scene.beginAnimation(task.loadedSkeletons[0],0,45,true,1.0);
                 console.log("success");
@@ -298,7 +304,24 @@
             //     // do something with the scene
             // });
      scene.onPointerDown = function (evt, pickResult) {
-        console.log(pickResult.pickedPoint);
+        // console.log(meshTask);
+        var x = Math.abs(meshTask.loadedMeshes[0].position.x - pickResult.pickedPoint.x);
+       var y = Math.abs(meshTask.loadedMeshes[0].position.z - pickResult.pickedPoint.z);
+    var z = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+    // 余弦
+    var cos = y / z;
+    // 弧度
+    var radina = Math.acos(cos);
+    // 角度
+    var angle =  180 / (Math.PI / radina);
+        // var direct = new BABYLON.Vector3(meshTask.loadedMeshes[0].rotation.x, r, meshTask.loadedMeshes[0].rotation.z); 
+        console.log(angle);
+        // meshTask.rotation = direct;
+        meshTask.loadedMeshes.forEach(function(mesh, index) {
+                    mesh.rotation.y = angle-Math.PI/2;
+                    // mesh.rotate(BABYLON.Axis.Y, angle, BABYLON.Space.WORLD);
+
+                    });
         }
             return scene;
         }
